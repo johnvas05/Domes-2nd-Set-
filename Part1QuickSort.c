@@ -24,7 +24,7 @@ int readFile(const char* filename, DataPoint** dataPoints) {
         return -1;
     }
 
-    char buffer[1024];
+    char buffer[2186];
     while (fgets(buffer, sizeof(buffer), file)) {
         char* token = strtok(buffer, ","); // Split the line by commas
         while (token != NULL) {
@@ -97,7 +97,7 @@ void quickSort(DataPoint arr[], int low, int high) {
 
 int main() {
     const char* filename = "tempm.txt";
-    const char* outputFilename = "sorted_tempm.txt";
+    const char* outputFilename = "sorted_tempm_QuickSort.txt";
     DataPoint* dataPoints = NULL;
     int size = readFile(filename, &dataPoints);
 
