@@ -15,18 +15,31 @@ int readFile(const char* filename, DataPoint** dataPoints) {
         return -1;
     }
 
+    // Get the file size to allocate appropriate buffer
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    rewind(file);
+
+    // Allocate buffer dynamically
+    char* buffer = (char*)malloc((fileSize + 1) * sizeof(char));
+    if (buffer == NULL) {
+        perror("Buffer allocation failed");
+        fclose(file);
+        return -1;
+    }
+
     int size = 0;
     int capacity = 10;
     *dataPoints = (DataPoint*)malloc(capacity * sizeof(DataPoint));
     if (*dataPoints == NULL) {
         perror("Memory allocation failed");
+        free(buffer);
         fclose(file);
         return -1;
     }
 
-    char buffer[1024];
-    while (fgets(buffer, sizeof(buffer), file)) {
-        char* token = strtok(buffer, ","); // Split the line by commas
+    while (fgets(buffer, fileSize + 1, file)) {
+        char* token = strtok(buffer, ",");
         while (token != NULL) {
             char timestamp[20];
             char temperatureStr[10];
@@ -41,15 +54,18 @@ int readFile(const char* filename, DataPoint** dataPoints) {
                     *dataPoints = (DataPoint*)realloc(*dataPoints, capacity * sizeof(DataPoint));
                     if (*dataPoints == NULL) {
                         perror("Memory reallocation failed");
+                        free(buffer);
                         fclose(file);
                         return -1;
                     }
                 }
             }
-            token = strtok(NULL, ","); // Move to the next token
+            token = strtok(NULL, ",");
         }
     }
 
+    // Free the dynamically allocated buffer
+    free(buffer);
     fclose(file);
     return size;
 }
@@ -97,7 +113,7 @@ void quickSort(DataPoint arr[], int low, int high) {
 
 int main() {
     const char* filename = "tempm.txt";
-    const char* outputFilename = "sorted_tempm.txt";
+    const char* outputFilename = "sorted_temperatures_QuickSort.txt";
     DataPoint* dataPoints = NULL;
     int size = readFile(filename, &dataPoints);
 
