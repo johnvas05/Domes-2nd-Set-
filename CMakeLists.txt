@@ -3,4 +3,4 @@ project(Domes_2 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(Domes_2 main.c)
+add_executable(Domes_2 Part1MergeSort.c)
