@@ -12,33 +12,46 @@ typedef struct {
     int humidity;
 } HumidityPoint;
 
+// Converts timestamps to numeric keys for interpolation
+long long timestampToKey(const char* timestamp) {
+    int year, month, day, hour, minute, second;
+    sscanf(timestamp, "%4d-%2d-%2dT%2d:%2d:%2d",
+           &year, &month, &day, &hour, &minute, &second);
+    return (long long)year * 10000000000LL +
+           (long long)month * 100000000LL +
+           (long long)day * 1000000LL +
+           (long long)hour * 10000LL +
+           (long long)minute * 100LL +
+           (long long)second;
+}
+
 int readTemperatureFile(const char* filename, DataPoint** dataPoints) {
     FILE* file = fopen(filename, "r");
-    if (file == NULL) {
+    if (!file) {
         perror("Error opening temperature file");
         return -1;
     }
 
-    int size = 0;
-    int capacity = 10;
-    *dataPoints = (DataPoint*)malloc(capacity * sizeof(DataPoint));
-    if (*dataPoints == NULL) {
+    int size = 0, capacity = 10;
+    *dataPoints = malloc(capacity * sizeof(DataPoint));
+    if (!*dataPoints) {
         perror("Memory allocation failed");
         fclose(file);
         return -1;
     }
 
-    while (!feof(file)) {
+    char line[100];
+    while (fgets(line, sizeof(line), file)) {
         char timestamp[20];
         double temperature;
-        if (fscanf(file, "{\"%19[^\"]\": \"%lf\"}\n", timestamp, &temperature) == 2) {
+        if (sscanf(line, "{\"%19[^\"]\": \"%lf\"}", timestamp, &temperature) == 2) {
             strcpy((*dataPoints)[size].timestamp, timestamp);
             (*dataPoints)[size].temperature = temperature;
             size++;
             if (size >= capacity) {
                 capacity *= 2;
-                *dataPoints = (DataPoint*)realloc(*dataPoints, capacity * sizeof(DataPoint));
-                if (*dataPoints == NULL) {
+                *dataPoints = realloc(*dataPoints, capacity * sizeof(DataPoint));
+                if (!*dataPoints) {
                     perror("Memory reallocation failed");
                     fclose(file);
                     return -1;
@@ -53,31 +66,31 @@ int readTemperatureFile(const char* filename, DataPoint** dataPoints) {
 
 int readHumidityFile(const char* filename, HumidityPoint** humidityPoints) {
     FILE* file = fopen(filename, "r");
-    if (file == NULL) {
+    if (!file) {
         perror("Error opening humidity file");
         return -1;
     }
 
-    int size = 0;
-    int capacity = 10;
-    *humidityPoints = (HumidityPoint*)malloc(capacity * sizeof(HumidityPoint));
-    if (*humidityPoints == NULL) {
+    int size = 0, capacity = 10;
+    *humidityPoints = malloc(capacity * sizeof(HumidityPoint));
+    if (!*humidityPoints) {
         perror("Memory allocation failed");
         fclose(file);
         return -1;
     }
 
-    while (!feof(file)) {
+    char line[100];
+    while (fgets(line, sizeof(line), file)) {
         char timestamp[20];
         int humidity;
-        if (fscanf(file, "{\"%19[^\"]\": \"%d\"}\n", timestamp, &humidity) == 2) {
+        if (sscanf(line, "{\"%19[^\"]\": \"%d\"}", timestamp, &humidity) == 2) {
             strcpy((*humidityPoints)[size].timestamp, timestamp);
             (*humidityPoints)[size].humidity = humidity;
             size++;
             if (size >= capacity) {
                 capacity *= 2;
-                *humidityPoints = (HumidityPoint*)realloc(*humidityPoints, capacity * sizeof(HumidityPoint));
-                if (*humidityPoints == NULL) {
+                *humidityPoints = realloc(*humidityPoints, capacity * sizeof(HumidityPoint));
+                if (!*humidityPoints) {
                     perror("Memory reallocation failed");
                     fclose(file);
                     return -1;
@@ -90,30 +103,34 @@ int readHumidityFile(const char* filename, HumidityPoint** humidityPoints) {
     return size;
 }
 
-int binaryInterpolationSearch(DataPoint* dataPoints, int size, const char* target) {
+// Binary Interpolation Search using timestamp-to-key mapping
+int binaryInterpolationSearch(const char timestamps[][20], int size, const char* target) {
+    long long targetKey = timestampToKey(target);
     int low = 0, high = size - 1;
 
-    while (low <= high && strcmp(target, dataPoints[low].timestamp) >= 0 && strcmp(target, dataPoints[high].timestamp) <= 0) {
-        if (strcmp(dataPoints[low].timestamp, dataPoints[high].timestamp) == 0) {
-            if (strcmp(dataPoints[low].timestamp, target) == 0) {
-                return low;
-            } else {
-                return -1;
-            }
+    while (low <= high) {
+        long long lowKey = timestampToKey(timestamps[low]);
+        long long highKey = timestampToKey(timestamps[high]);
+
+        if (targetKey < lowKey || targetKey > highKey)
+            return -1;
+
+        if (lowKey == highKey) {
+            return (targetKey == lowKey) ? low : -1;
         }
 
-        int pos = low + ((double)(high - low) * (strcmp(target, dataPoints[low].timestamp)) /
-                         (strcmp(dataPoints[high].timestamp, dataPoints[low].timestamp)));
+        int pos = low + (int)(((double)(high - low) * (targetKey - lowKey)) / (highKey - lowKey));
 
-        if (strcmp(dataPoints[pos].timestamp, target) == 0) {
+        if (pos < low || pos > high) return -1;
+
+        long long posKey = timestampToKey(timestamps[pos]);
+
+        if (posKey == targetKey)
             return pos;
-        }
-
-        if (strcmp(dataPoints[pos].timestamp, target) < 0) {
+        else if (posKey < targetKey)
             low = pos + 1;
-        } else {
+        else
             high = pos - 1;
-        }
     }
 
     return -1;
@@ -135,10 +152,16 @@ int main() {
 
     char userTimestamp[20];
     printf("Enter a timestamp (YYYY-MM-DDTHH:MM:SS): ");
-    scanf("%s", userTimestamp);
+    scanf("%19s", userTimestamp);
 
-    int tempIndex = binaryInterpolationSearch(temperatureData, tempSize, userTimestamp);
-    int humIndex = binaryInterpolationSearch((DataPoint*)humidityData, humSize, userTimestamp);
+    // Extract just the timestamps for searching
+    char tempTimestamps[tempSize][20];
+    char humTimestamps[humSize][20];
+    for (int i = 0; i < tempSize; i++) strcpy(tempTimestamps[i], temperatureData[i].timestamp);
+    for (int i = 0; i < humSize; i++) strcpy(humTimestamps[i], humidityData[i].timestamp);
+
+    int tempIndex = binaryInterpolationSearch(tempTimestamps, tempSize, userTimestamp);
+    int humIndex = binaryInterpolationSearch(humTimestamps, humSize, userTimestamp);
 
     if (tempIndex != -1 && humIndex != -1) {
         printf("Timestamp: %s\n", userTimestamp);
@@ -150,6 +173,5 @@ int main() {
 
     free(temperatureData);
     free(humidityData);
-
     return 0;
 }
