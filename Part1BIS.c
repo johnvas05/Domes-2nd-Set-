@@ -1,52 +1,155 @@
-// C program to implement interpolation search
-// with recursion
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// If x is present in arr[0..n-1], then returns
-// index of it, else returns -1.
-int interpolationSearch(int arr[], int lo, int hi, int x)
-{
-    int pos;
-    // Since array is sorted, an element present
-    // in array must be in range defined by corner
-    if (lo <= hi && x >= arr[lo] && x <= arr[hi]) {
-        // Probing the position with keeping
-        // uniform distribution in mind.
-        pos = lo
-              + (((double)(hi - lo) / (arr[hi] - arr[lo]))
-                 * (x - arr[lo]));
+typedef struct {
+    char timestamp[20];
+    double temperature;
+} DataPoint;
 
-        // Condition of target found
-        if (arr[pos] == x)
-            return pos;
+typedef struct {
+    char timestamp[20];
+    int humidity;
+} HumidityPoint;
 
-        // If x is larger, x is in right sub array
-        if (arr[pos] < x)
-            return interpolationSearch(arr, pos + 1, hi, x);
-
-        // If x is smaller, x is in left sub array
-        if (arr[pos] > x)
-            return interpolationSearch(arr, lo, pos - 1, x);
+int readTemperatureFile(const char* filename, DataPoint** dataPoints) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening temperature file");
+        return -1;
     }
+
+    int size = 0;
+    int capacity = 10;
+    *dataPoints = (DataPoint*)malloc(capacity * sizeof(DataPoint));
+    if (*dataPoints == NULL) {
+        perror("Memory allocation failed");
+        fclose(file);
+        return -1;
+    }
+
+    while (!feof(file)) {
+        char timestamp[20];
+        double temperature;
+        if (fscanf(file, "{\"%19[^\"]\": \"%lf\"}\n", timestamp, &temperature) == 2) {
+            strcpy((*dataPoints)[size].timestamp, timestamp);
+            (*dataPoints)[size].temperature = temperature;
+            size++;
+            if (size >= capacity) {
+                capacity *= 2;
+                *dataPoints = (DataPoint*)realloc(*dataPoints, capacity * sizeof(DataPoint));
+                if (*dataPoints == NULL) {
+                    perror("Memory reallocation failed");
+                    fclose(file);
+                    return -1;
+                }
+            }
+        }
+    }
+
+    fclose(file);
+    return size;
+}
+
+int readHumidityFile(const char* filename, HumidityPoint** humidityPoints) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening humidity file");
+        return -1;
+    }
+
+    int size = 0;
+    int capacity = 10;
+    *humidityPoints = (HumidityPoint*)malloc(capacity * sizeof(HumidityPoint));
+    if (*humidityPoints == NULL) {
+        perror("Memory allocation failed");
+        fclose(file);
+        return -1;
+    }
+
+    while (!feof(file)) {
+        char timestamp[20];
+        int humidity;
+        if (fscanf(file, "{\"%19[^\"]\": \"%d\"}\n", timestamp, &humidity) == 2) {
+            strcpy((*humidityPoints)[size].timestamp, timestamp);
+            (*humidityPoints)[size].humidity = humidity;
+            size++;
+            if (size >= capacity) {
+                capacity *= 2;
+                *humidityPoints = (HumidityPoint*)realloc(*humidityPoints, capacity * sizeof(HumidityPoint));
+                if (*humidityPoints == NULL) {
+                    perror("Memory reallocation failed");
+                    fclose(file);
+                    return -1;
+                }
+            }
+        }
+    }
+
+    fclose(file);
+    return size;
+}
+
+int binaryInterpolationSearch(DataPoint* dataPoints, int size, const char* target) {
+    int low = 0, high = size - 1;
+
+    while (low <= high && strcmp(target, dataPoints[low].timestamp) >= 0 && strcmp(target, dataPoints[high].timestamp) <= 0) {
+        if (strcmp(dataPoints[low].timestamp, dataPoints[high].timestamp) == 0) {
+            if (strcmp(dataPoints[low].timestamp, target) == 0) {
+                return low;
+            } else {
+                return -1;
+            }
+        }
+
+        int pos = low + ((double)(high - low) * (strcmp(target, dataPoints[low].timestamp)) /
+                         (strcmp(dataPoints[high].timestamp, dataPoints[low].timestamp)));
+
+        if (strcmp(dataPoints[pos].timestamp, target) == 0) {
+            return pos;
+        }
+
+        if (strcmp(dataPoints[pos].timestamp, target) < 0) {
+            low = pos + 1;
+        } else {
+            high = pos - 1;
+        }
+    }
+
     return -1;
 }
 
-// Driver Code
-int main()
-{
-    // Array of items on which search will
-    // be conducted.
-    int arr[] = { 10, 12, 13, 16, 18, 19, 20, 21,
-                  22, 23, 24, 33, 35, 42, 47 };
-    int n = sizeof(arr) / sizeof(arr[0]);
+int main() {
+    const char* temperatureFile = "c:\\Users\\thodo\\Documents\\dome II\\Domes-2nd-Set-\\tempm.txt";
+    const char* humidityFile = "c:\\Users\\thodo\\Documents\\dome II\\Domes-2nd-Set-\\hum.txt";
 
-    int x = 18; // Element to be searched
-    int index = interpolationSearch(arr, 0, n - 1, x);
+    DataPoint* temperatureData = NULL;
+    HumidityPoint* humidityData = NULL;
 
-    // If element was found
-    if (index != -1)
-        printf("Element found at index %d", index);
-    else
-        printf("Element not found.");
+    int tempSize = readTemperatureFile(temperatureFile, &temperatureData);
+    int humSize = readHumidityFile(humidityFile, &humidityData);
+
+    if (tempSize == -1 || humSize == -1) {
+        return 1;
+    }
+
+    char userTimestamp[20];
+    printf("Enter a timestamp (YYYY-MM-DDTHH:MM:SS): ");
+    scanf("%s", userTimestamp);
+
+    int tempIndex = binaryInterpolationSearch(temperatureData, tempSize, userTimestamp);
+    int humIndex = binaryInterpolationSearch((DataPoint*)humidityData, humSize, userTimestamp);
+
+    if (tempIndex != -1 && humIndex != -1) {
+        printf("Timestamp: %s\n", userTimestamp);
+        printf("Temperature: %.2f\n", temperatureData[tempIndex].temperature);
+        printf("Humidity: %d\n", humidityData[humIndex].humidity);
+    } else {
+        printf("Timestamp not found in the data.\n");
+    }
+
+    free(temperatureData);
+    free(humidityData);
+
     return 0;
 }
