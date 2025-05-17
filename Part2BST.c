@@ -274,8 +274,14 @@ BSTNode* insert(BSTNode* node, const char* date, double temperature) {
 void printBST(BSTNode* root) {
     if (!root) return;
     printBST(root->left);
-    printf("Date: %s, Average Temperature: %.2f°C, Number of measurements: %d\n",
-           root->date, root->avgTemp, root->count);
+
+    // Print header for each record
+    printf("----- Record -----\n");
+    printf("Date: %s\n", root->date);
+    printf("Average Temperature: %.2f°C\n", root->avgTemp);
+    printf("Number of measurements: %d\n", root->count);
+    printf("------------------\n");
+
     printBST(root->right);
 }
 
@@ -287,6 +293,106 @@ int isBalanced(BSTNode* node) {
     if (balance < -1 || balance > 1)
         return 0;
     return isBalanced(node->left) && isBalanced(node->right);
+}
+
+// Search for a date in the BST and print the average temperature
+void searchByDate(BSTNode* root, const char* date) {
+    if (!root) {
+        printf("Date %s not found in the records.\n", date);
+        return;
+    }
+    int cmp = strcmp(date, root->date);
+    if (cmp == 0) {
+        printf("----- Record Found -----\n");
+        printf("Date: %s\n", root->date);
+        printf("Average Temperature: %.2f°C\n", root->avgTemp);
+        printf("Number of measurements: %d\n", root->count);
+        printf("------------------------\n");
+    } else if (cmp < 0) {
+        searchByDate(root->left, date);
+    } else {
+        searchByDate(root->right, date);
+    }
+}
+
+// Edit the average temperature for a specific date
+void editAvgTemperature(BSTNode* root, const char* date, double newAvg) {
+    if (!root) {
+        printf("Date %s not found in the records.\n", date);
+        return;
+    }
+    int cmp = strcmp(date, root->date);
+    if (cmp == 0) {
+        root->avgTemp = newAvg;
+        root->totalTemp = newAvg * root->count;
+        printf("Average temperature for %s updated to %.2f°C.\n", root->date, root->avgTemp);
+    } else if (cmp < 0) {
+        editAvgTemperature(root->left, date, newAvg);
+    } else {
+        editAvgTemperature(root->right, date, newAvg);
+    }
+}
+
+BSTNode* minValueNode(BSTNode* node) {
+    BSTNode* current = node;
+    while (current && current->left)
+        current = current->left;
+    return current;
+}
+
+BSTNode* deleteNode(BSTNode* root, const char* date) {
+    if (!root) {
+        printf("Date %s not found in the records.\n", date);
+        return root;
+    }
+    int cmp = strcmp(date, root->date);
+    if (cmp < 0) {
+        root->left = deleteNode(root->left, date);
+    } else if (cmp > 0) {
+        root->right = deleteNode(root->right, date);
+    } else {
+        // Node with only one child or no child
+        if (!root->left || !root->right) {
+            BSTNode* temp = root->left ? root->left : root->right;
+            free(root->date);
+            free(root);
+            return temp;
+        }
+        // Node with two children
+        BSTNode* temp = minValueNode(root->right);
+        free(root->date);
+        root->date = strdup(temp->date);
+        root->totalTemp = temp->totalTemp;
+        root->count = temp->count;
+        root->avgTemp = temp->avgTemp;
+        root->right = deleteNode(root->right, temp->date);
+    }
+
+    // Update height and balance
+    root->height = 1 + max(height(root->left), height(root->right));
+    int balance = getBalance(root);
+
+    // Left Left
+    if (balance > 1 && getBalance(root->left) >= 0)
+        return rightRotate(root);
+
+    // Left Right
+    if (balance > 1 && getBalance(root->left) < 0) {
+        root->left = leftRotate(root->left);
+        return rightRotate(root);
+    }
+
+    // Right Right
+    if (balance < -1 && getBalance(root->right) <= 0)
+        return leftRotate(root);
+
+    // Right Left
+    if (balance < -1 && getBalance(root->right) > 0) {
+        root->right = rightRotate(root->right);
+        return leftRotate(root);
+    }
+
+    return root;
 }
 
 int main() {
@@ -324,6 +430,58 @@ int main() {
 
     // Save the results
     writeDailyAverages(dailyAverages, daysCount);
+
+    int choice;
+    char searchDate[11];
+    do {
+        printf("\nMenu:\n");
+        printf("1. Print BST in-order traversal (by date)\n");
+        printf("2. Search for average temperature by date\n");
+        printf("3. Edit average temperature for a date\n");
+        printf("4. Delete a record by date\n");
+        printf("5. Exit\n");
+        printf("Enter your choice: ");
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n'); // clear invalid input
+            continue;
+        }
+        switch (choice) {
+            case 1:
+                printf("\nBST In-Order Traversal (by Date):\n");
+                printBST(root);
+                break;
+            case 2:
+                printf("Enter a date to search for average temperature (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    searchByDate(root, searchDate);
+                }
+                break;
+            case 3: {
+                printf("Enter a date to edit (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    double newAvg;
+                    printf("Enter new average temperature: ");
+                    if (scanf("%lf", &newAvg) == 1) {
+                        editAvgTemperature(root, searchDate, newAvg);
+                    } else {
+                        printf("Invalid temperature input.\n");
+                        while (getchar() != '\n');
+                    }
+                }
+                break;
+            }
+            case 4:
+                printf("Enter a date to delete (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    root = deleteNode(root, searchDate);
+                }
+                break;
+            case 5:
+                break;
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    } while (choice != 5);
 
     // Free memory
     free(dataPoints);
