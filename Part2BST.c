@@ -14,9 +14,21 @@ typedef struct {
     double avgTemp;
 } DailyAverage;
 
+typedef struct BSTNode {
+    char* date;             // e.g., "2014-02-13"
+    double totalTemp;       // sum of all temperatures for the day
+    int count;              // number of measurements for the day
+    double avgTemp;         // average temperature for the day
+    int height; // <-- AVL height
+    struct BSTNode* left;
+    struct BSTNode* right;
+} BSTNode;
+
+BSTNode* root = NULL; // <-- Declare the AVL tree root globally
+
 int readFile(DataPoint** dataPoints) {
     // Open the file directly with the full path
-    FILE* file = fopen("C:/Users/pbili/CLionProjects/Domes-2nd-Set-/tempm.txt", "r");
+    FILE* file = fopen("tempm.txt", "r");
     if (file == NULL) {
         perror("Error opening file");
         return -1;
@@ -178,6 +190,105 @@ void writeDailyAverages(DailyAverage* dailyAvgs, int size) {
     printf("Daily average temperatures saved to daily_average_temperatures.txt\n");
 }
 
+// Utility functions for AVL
+int max(int a, int b) { return (a > b) ? a : b; }
+
+int height(BSTNode* n) {
+    return n ? n->height : 0;
+}
+
+int getBalance(BSTNode* n) {
+    return n ? height(n->left) - height(n->right) : 0;
+}
+
+BSTNode* rightRotate(BSTNode* y) {
+    BSTNode* x = y->left;
+    BSTNode* T2 = x->right;
+    x->right = y;
+    y->left = T2;
+    y->height = max(height(y->left), height(y->right)) + 1;
+    x->height = max(height(x->left), height(x->right)) + 1;
+    return x;
+}
+
+BSTNode* leftRotate(BSTNode* x) {
+    BSTNode* y = x->right;
+    BSTNode* T2 = y->left;
+    y->left = x;
+    x->right = T2;
+    x->height = max(height(x->left), height(x->right)) + 1;
+    y->height = max(height(y->left), height(y->right)) + 1;
+    return y;
+}
+
+// AVL insert
+BSTNode* insert(BSTNode* node, const char* date, double temperature) {
+    if (!node) {
+        BSTNode* n = malloc(sizeof(BSTNode));
+        n->date = strdup(date);
+        n->totalTemp = temperature;
+        n->count = 1;
+        n->avgTemp = temperature;
+        n->height = 1;
+        n->left = n->right = NULL;
+        return n;
+    }
+    int cmp = strcmp(date, node->date);
+    if (cmp == 0) {
+        node->totalTemp += temperature;
+        node->count++;
+        node->avgTemp = node->totalTemp / node->count;
+        return node;
+    } else if (cmp < 0) {
+        node->left = insert(node->left, date, temperature);
+    } else {
+        node->right = insert(node->right, date, temperature);
+    }
+
+    node->height = 1 + max(height(node->left), height(node->right));
+    int balance = getBalance(node);
+
+    // Left Left
+    if (balance > 1 && strcmp(date, node->left->date) < 0)
+        return rightRotate(node);
+
+    // Right Right
+    if (balance < -1 && strcmp(date, node->right->date) > 0)
+        return leftRotate(node);
+
+    // Left Right
+    if (balance > 1 && strcmp(date, node->left->date) > 0) {
+        node->left = leftRotate(node->left);
+        return rightRotate(node);
+    }
+
+    // Right Left
+    if (balance < -1 && strcmp(date, node->right->date) < 0) {
+        node->right = rightRotate(node->right);
+        return leftRotate(node);
+    }
+
+    return node;
+}
+
+void printBST(BSTNode* root) {
+    if (!root) return;
+    printBST(root->left);
+    printf("Date: %s, Average Temperature: %.2f°C, Number of measurements: %d\n",
+           root->date, root->avgTemp, root->count);
+    printBST(root->right);
+}
+
+int isBalanced(BSTNode* node) {
+    if (!node) return 1;
+    int lh = height(node->left);
+    int rh = height(node->right);
+    int balance = lh - rh;
+    if (balance < -1 || balance > 1)
+        return 0;
+    return isBalanced(node->left) && isBalanced(node->right);
+}
+
 int main() {
     DataPoint* dataPoints = NULL;
     DailyAverage* dailyAverages = NULL;
@@ -189,6 +300,13 @@ int main() {
     }
 
     printf("Read %d data points\n", dataSize);
+
+    // Build the AVL tree from dataPoints
+    for (int i = 0; i < dataSize; i++) {
+        char* date = extractDate(dataPoints[i].timestamp);
+        root = insert(root, date, dataPoints[i].temperature);
+        free(date);
+    }
 
     // Calculate the daily averages
     int daysCount = calculateDailyAverages(dataPoints, dataSize, &dailyAverages);
@@ -210,6 +328,12 @@ int main() {
     // Free memory
     free(dataPoints);
     freeDailyAverages(dailyAverages, daysCount);
+
+    if (isBalanced(root)) {
+        printf("The AVL tree is balanced.\n");
+    } else {
+        printf("The AVL tree is NOT balanced.\n");
+    }
 
     return 0;
 }
