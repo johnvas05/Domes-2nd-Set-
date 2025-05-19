@@ -210,6 +210,32 @@ void editAvgTemperature(HashTable* table, const char* date, double newAvg) {
     }
 }
 
+// Function to write hash table contents to a file
+void writeHashTableToFile(HashTable* table, const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        perror("Error opening output file");
+        return;
+    }
+
+    fprintf(file, "Temperature Records Export\n");
+    fprintf(file, "========================\n\n");
+
+    for (int i = 0; i < BUCKET_COUNT; i++) {
+        HashNode* current = table->buckets[i];
+        while (current) {
+            fprintf(file, "Date: %s\n", current->date);
+            fprintf(file, "Average Temperature: %.2f°C\n", current->avgTemp);
+            fprintf(file, "Number of measurements: %d\n", current->count);
+            fprintf(file, "------------------------\n");
+            current = current->next;
+        }
+    }
+
+    fclose(file);
+    printf("Results have been exported to %s\n", filename);
+}
+
 int main() {
     DataPoint* dataPoints = NULL;
     HashTable table = {0}; // Initialize the hash table with NULL buckets
@@ -270,6 +296,8 @@ int main() {
                 }
                 break;
             case 4:
+                printf("Exporting results before exit...\n");
+                writeHashTableToFile(&table, "HashTableResults.txt");
                 printf("Exiting application.\n");
                 break;
             default:
