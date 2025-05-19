@@ -1,0 +1,8 @@
+[
+{
+  "directory": "C:/Users/thodo/Documents/dome II/Domes-2nd-Set-/build",
+  "command": "C:\\TDM-GCC-64\\bin\\gcc.exe   -g -std=gnu11 -o CMakeFiles\\Domes_2.dir\\Part1MergeSort.c.obj -c \"C:\\Users\\thodo\\Documents\\dome II\\Domes-2nd-Set-\\Part1MergeSort.c\"",
+  "file": "C:/Users/thodo/Documents/dome II/Domes-2nd-Set-/Part1MergeSort.c",
+  "output": "CMakeFiles/Domes_2.dir/Part1MergeSort.c.obj"
+}
+]
