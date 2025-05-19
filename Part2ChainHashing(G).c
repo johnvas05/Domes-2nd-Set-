@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Define the DataPoint structure
+typedef struct {
+    char timestamp[20]; // e.g., "2014-02-13T12:00:00"
+    double temperature; // Temperature value
+} DataPoint;
+
 #define BUCKET_COUNT 11 // Number of buckets (odd number)
 
 typedef struct HashNode {
@@ -180,6 +186,30 @@ int readFile(DataPoint** dataPoints) {
     return size;
 }
 
+// Search for average temperature by date
+void searchByDate(HashTable* table, const char* date) {
+    HashNode* node = searchHashTable(table, date);
+    if (node) {
+        printf("Date: %s\n", node->date);
+        printf("Average Temperature: %.2f°C\n", node->avgTemp);
+        printf("Number of measurements: %d\n", node->count);
+    } else {
+        printf("Date %s not found in the records.\n", date);
+    }
+}
+
+// Edit average temperature by date
+void editAvgTemperature(HashTable* table, const char* date, double newAvg) {
+    HashNode* node = searchHashTable(table, date);
+    if (node) {
+        node->avgTemp = newAvg;
+        node->totalTemp = newAvg * node->count;
+        printf("Average temperature for %s updated to %.2f°C.\n", node->date, node->avgTemp);
+    } else {
+        printf("Date %s not found in the records.\n", date);
+    }
+}
+
 int main() {
     DataPoint* dataPoints = NULL;
     HashTable table = {0}; // Initialize the hash table with NULL buckets
@@ -190,8 +220,6 @@ int main() {
         return 1;
     }
 
-    printf("Read %d data points\n", dataSize);
-
     // Insert data into the hash table
     for (int i = 0; i < dataSize; i++) {
         char* date = extractDate(dataPoints[i].timestamp);
@@ -201,30 +229,53 @@ int main() {
         }
     }
 
-    // Print the hash table
-    printf("\nHash Table:\n");
-    printHashTable(&table);
-
-    // Search for a specific date
+    int choice;
     char searchDate[11];
-    printf("\nEnter a date to search (YYYY-MM-DD): ");
-    scanf("%10s", searchDate);
-    HashNode* result = searchHashTable(&table, searchDate);
-    if (result) {
-        printf("Date: %s, Average Temperature: %.2f°C, Measurements: %d\n",
-               result->date, result->avgTemp, result->count);
-    } else {
-        printf("Date %s not found in the records.\n", searchDate);
-    }
-
-    // Delete a specific date
-    printf("\nEnter a date to delete (YYYY-MM-DD): ");
-    scanf("%10s", searchDate);
-    deleteFromHashTable(&table, searchDate);
-
-    // Print the hash table after deletion
-    printf("\nHash Table After Deletion:\n");
-    printHashTable(&table);
+    do {
+        printf("\nMenu:\n");
+        printf("1. Search for AVERAGE TEMPERATURE by DATE\n");
+        printf("2. Edit the average temperature by DATE\n");
+        printf("3. Delete a record by DATE\n");
+        printf("4. Exit\n");
+        printf("Choice: ");
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n'); // clear invalid input
+            continue;
+        }
+        switch (choice) {
+            case 1:
+                printf("Enter date (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    searchByDate(&table, searchDate);
+                }
+                break;
+            case 2: {
+                printf("Enter date (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    double newAvg;
+                    printf("Enter new average temperature: ");
+                    if (scanf("%lf", &newAvg) == 1) {
+                        editAvgTemperature(&table, searchDate, newAvg);
+                    } else {
+                        printf("Invalid temperature value.\n");
+                        while (getchar() != '\n');
+                    }
+                }
+                break;
+            }
+            case 3:
+                printf("Enter date (YYYY-MM-DD): ");
+                if (scanf("%10s", searchDate) == 1) {
+                    deleteFromHashTable(&table, searchDate);
+                }
+                break;
+            case 4:
+                printf("Exiting application.\n");
+                break;
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    } while (choice != 4);
 
     // Free memory
     free(dataPoints);
