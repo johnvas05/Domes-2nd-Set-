@@ -1,3 +1,0 @@
-"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\Domes_2.dir/objects.a
-C:\TDM-GCC-64\bin\ar.exe qc CMakeFiles\Domes_2.dir/objects.a @CMakeFiles\Domes_2.dir\objects1.rsp
-C:\TDM-GCC-64\bin\gcc.exe -g -Wl,--whole-archive CMakeFiles\Domes_2.dir/objects.a -Wl,--no-whole-archive -o Domes_2.exe -Wl,--out-implib,libDomes_2.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\Domes_2.dir\linkLibs.rsp
