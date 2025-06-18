@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef struct {
     char timestamp[20];
@@ -81,42 +82,87 @@ int readFiles(const char* tempFile, const char* humFile, DataPoint** dataPoints)
     return size;
 }
 
-// Binary Interpolation Search using timestamp-to-key mapping
-int binaryInterpolationSearch(DataPoint* dataPoints, int size, const char* target) {
-    long long targetKey = timestampToKey(target);
-    int low = 0, high = size - 1;
+// Συνάρτηση μετατροπής timestamp σε αριθμητικό κλειδί (υπάρχει ήδη στο αρχείο σου)
+long long timestampToKey(const char* timestamp);
 
-    while (low <= high) {
-        long long lowKey = timestampToKey(dataPoints[low].timestamp);
-        long long highKey = timestampToKey(dataPoints[high].timestamp);
+// Jump Interpolation Search για DataPoint
+int jump_interpolation_search(DataPoint* data, int n, const char* targetTimestamp) {
+    long long key = timestampToKey(targetTimestamp);
+    int left = 0, right = n - 1;
+    int size = right - left + 1;
+    int next = left + (int)((size * (double)(key - timestampToKey(data[left].timestamp))) /
+                            (timestampToKey(data[right].timestamp) - timestampToKey(data[left].timestamp)));
 
-        if (targetKey < lowKey || targetKey > highKey)
+    while (left <= right && key != timestampToKey(data[next].timestamp)) {
+        int i = 0;
+        size = right - left + 1;
+        if (size <= 3) { // Απευθείας αναζήτηση
+            for (int j = left; j <= right; j++) {
+                if (timestampToKey(data[j].timestamp) == key) return j;
+            }
             return -1;
-
-        if (lowKey == highKey) {
-            return (targetKey == lowKey) ? low : -1;
         }
-
-        int pos = low + (int)(((double)(high - low) * (targetKey - lowKey)) / (highKey - lowKey));
-
-        if (pos < low || pos > high) return -1;
-
-        long long posKey = timestampToKey(dataPoints[pos].timestamp);
-
-        if (posKey == targetKey)
-            return pos;
-        else if (posKey < targetKey)
-            low = pos + 1;
-        else
-            high = pos - 1;
+        if (key > timestampToKey(data[next].timestamp)) {
+            while (next + (i + 1) * (int)sqrt(size) <= right &&
+                   key > timestampToKey(data[next + (i + 1) * (int)sqrt(size)].timestamp)) {
+                i++;
+            }
+            left = next + i * (int)sqrt(size);
+            right = next + (i + 1) * (int)sqrt(size);
+            if (right > n - 1) right = n - 1;
+        } else {
+            while (next - (i + 1) * (int)sqrt(size) >= left &&
+                   key < timestampToKey(data[next - (i + 1) * (int)sqrt(size)].timestamp)) {
+                i++;
+            }
+            right = next - i * (int)sqrt(size);
+            left = next - (i + 1) * (int)sqrt(size);
+            if (left < 0) left = 0;
+        }
+        size = right - left + 1;
+        long long leftKey = timestampToKey(data[left].timestamp);
+        long long rightKey = timestampToKey(data[right].timestamp);
+        if (rightKey == leftKey) break; // αποφυγή διαίρεσης με το μηδέν
+        next = left + (int)((size * (double)(key - leftKey)) / (rightKey - leftKey));
     }
-
+    if (timestampToKey(data[next].timestamp) == key) return next;
     return -1;
 }
 
+// Swap function for DataPoint
+void swap(DataPoint* a, DataPoint* b) {
+    DataPoint temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// Partition function for timestamp
+int partition(DataPoint arr[], int low, int high) {
+    long long pivot = timestampToKey(arr[high].timestamp);
+    int i = (low - 1);
+
+    for (int j = low; j <= high - 1; j++) {
+        if (timestampToKey(arr[j].timestamp) < pivot) {
+            i++;
+            swap(&arr[i], &arr[j]);
+        }
+    }
+    swap(&arr[i + 1], &arr[high]);
+    return (i + 1);
+}
+
+// QuickSort for DataPoint by timestamp
+void quickSortByTimestamp(DataPoint arr[], int low, int high) {
+    if (low < high) {
+        int pi = partition(arr, low, high);
+        quickSortByTimestamp(arr, low, pi - 1);
+        quickSortByTimestamp(arr, pi + 1, high);
+    }
+}
+
 int main() {
-    const char* temperatureFile = "c:\\Users\\thodo\\Documents\\dome II\\Domes-2nd-Set-\\tempm.txt";
-    const char* humidityFile = "c:\\Users\\thodo\\Documents\\dome II\\Domes-2nd-Set-\\hum.txt";
+    const char* temperatureFile = "c:\\Users\\teo\\Documents\\DOMES PART II\\Domes-2nd-Set-\\tempm.txt";
+    const char* humidityFile = "c:\\Users\\teo\\Documents\\DOMES PART II\\Domes-2nd-Set-\\hum.txt";
 
     DataPoint* dataPoints = NULL;
     int dataSize = readFiles(temperatureFile, humidityFile, &dataPoints);
@@ -136,8 +182,10 @@ int main() {
     char userTimestamp[20];
     printf("\nEnter a timestamp to search (YYYY-MM-DDTHH:MM:SS): ");
     scanf("%19s", userTimestamp);
+    
+    quickSortByTimestamp(dataPoints, 0, dataSize - 1);
 
-    int index = binaryInterpolationSearch(dataPoints, dataSize, userTimestamp);
+    int index = jump_interpolation_search(dataPoints, dataSize, userTimestamp);
 
     if (index != -1) {
         printf("\nFound timestamp at index %d:\n", index);
