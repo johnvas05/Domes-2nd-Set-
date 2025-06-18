@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 
-def load_temperatures(filename='tempm.txt'):
+def load_temperatures(filename='C:/Users/teo/Documents/DOMES PART II/Domes-2nd-Set-/tempm.txt'):
     """Load temperatures from file and return sorted timestamps and temperatures as lists"""
     timestamps = []
     temperatures = []
@@ -23,7 +23,7 @@ def load_temperatures(filename='tempm.txt'):
     return list(timestamps), list(temperatures)
 
 
-def load_humidities(filename='hum.txt'):
+def load_humidities(filename='C:/Users/teo/Documents/DOMES PART II/Domes-2nd-Set-/hum.txt'):
     """Load humidities from file and return sorted timestamps and humidities as lists"""
     hum_timestamps = []
     humidities = []
@@ -58,24 +58,51 @@ def normalize_timestamp(ts):
         return ts  # fallback if format is wrong
 
 
-def bis(timestamps, temperatures, target_time):
-    """Binary Interpolation Search"""
-    low, high = 0, len(timestamps) - 1
+def jump_interpolation_search(timestamps, temperatures, target_time):
+    """Jump Interpolation Search for timestamps (Python version of your C code)"""
+    def ts_to_num(ts):
+        return timestamp_to_number(ts)
+
+    key = ts_to_num(target_time)
+    n = len(timestamps)
+    left, right = 0, n - 1
     steps = 0
 
-    while low <= high:
+    while left <= right:
         steps += 1
-        if timestamps[high] == timestamps[low]:
-            pos = low
-        else:
-            pos = (low + high) // 2
+        size = right - left + 1
+        left_key = ts_to_num(timestamps[left])
+        right_key = ts_to_num(timestamps[right])
+        if key < left_key or key > right_key:
+            return None, steps
 
-        if timestamps[pos] == target_time:
-            return temperatures[pos], steps
-        elif timestamps[pos] < target_time:
-            low = pos + 1
+        if right_key == left_key:
+            pos = left
         else:
-            high = pos - 1
+            pos = left + int((size * (key - left_key)) / (right_key - left_key))
+            pos = max(left, min(pos, right))
+
+        if ts_to_num(timestamps[pos]) == key:
+            return temperatures[pos], steps
+
+        if size <= 3:
+            for j in range(left, right + 1):
+                if ts_to_num(timestamps[j]) == key:
+                    return temperatures[j], steps
+            return None, steps
+
+        if key > ts_to_num(timestamps[pos]):
+            i = 0
+            while pos + (i + 1) * int(np.sqrt(size)) <= right and key > ts_to_num(timestamps[pos + (i + 1) * int(np.sqrt(size))]):
+                i += 1
+            left = pos + i * int(np.sqrt(size))
+            right = min(pos + (i + 1) * int(np.sqrt(size)), n - 1)
+        else:
+            i = 0
+            while pos - (i + 1) * int(np.sqrt(size)) >= left and key < ts_to_num(timestamps[pos - (i + 1) * int(np.sqrt(size))]):
+                i += 1
+            right = pos - i * int(np.sqrt(size))
+            left = max(pos - (i + 1) * int(np.sqrt(size)), 0)
 
     return None, steps
 
@@ -167,7 +194,7 @@ def main():
             print(f"Final normalized timestamp: {timestamp}")
 
             # Search using both algorithms
-            temp_bis, steps_bis = bis(timestamps, temperatures, timestamp)
+            temp_jump, steps_jump = jump_interpolation_search(timestamps, temperatures, timestamp)
             temp_labis, steps_labis = labis(timestamps, temperatures, timestamp, LinearRegression())
 
             # Get humidity for the searched timestamp
@@ -181,12 +208,12 @@ def main():
             print("\nResults:")
             print("-" * 40)
 
-            if temp_bis is not None:
-                print(f"Temperature: {temp_bis}°C")
+            if temp_jump is not None:
+                print(f"Temperature: {temp_jump}°C")
                 print(f"Humidity: {hum}")
-                print(f"BIS steps: {steps_bis}")
+                print(f"Jump steps: {steps_jump}")
                 print(f"LABIS steps: {steps_labis}")
-                print(f"LABIS improvement: {steps_bis - steps_labis} steps")
+                print(f"LABIS improvement: {steps_jump - steps_labis} steps")
             else:
                 print("No temperature data found for this timestamp.")
                 print(f"Humidity: {hum}")
